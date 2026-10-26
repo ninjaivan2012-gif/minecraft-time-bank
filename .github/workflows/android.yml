@@ -1,0 +1,60 @@
+name: Build Android app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Collect web files
+        run: |
+          mkdir -p www
+          cp index.html manifest.json sw.js icon-*.png www/
+
+      - name: Create Android project
+        run: |
+          npm init -y
+          npm install @capacitor/core@6.2.0 @capacitor/cli@6.2.0 @capacitor/android@6.2.0
+          npx cap init "MC Time Bank" com.ninjaivan.mctimebank --web-dir www
+          npx cap add android
+          npx cap sync android
+
+      - name: Add app icon
+        run: |
+          rm -rf android/app/src/main/res/mipmap-anydpi-v26
+          cp -r android-icons/* android/app/src/main/res/
+
+      - name: Build APK
+        run: |
+          mkdir -p ~/.android
+          cp android-build/debug.keystore ~/.android/debug.keystore
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk ../MinecraftTimeBank.apk
+
+      - name: Publish download
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest MinecraftTimeBank.apk \
+            --title "Minecraft Time Bank (latest)" \
+            --notes "Tap MinecraftTimeBank.apk below to download, then open it to install."
