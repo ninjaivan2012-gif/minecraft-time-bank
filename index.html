@@ -81,12 +81,21 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-o
 
 /* Adjust */
 .panel{display:flex;flex-direction:column;gap:12px}
-.chips{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.chip{padding:11px 4px;border-radius:9px;font-weight:800;font-size:.95rem;border:2px solid var(--line);background:var(--surface)}
-.chip.add{color:var(--grass)} .chip.add:hover{background:var(--grass-soft);border-color:var(--grass)}
-.chip.sub{color:var(--redstone)} .chip.sub:hover{background:var(--red-soft);border-color:var(--redstone)}
-.custom{display:grid;grid-template-columns:80px 1fr auto auto;gap:8px}
-@media (max-width:460px){.custom{grid-template-columns:76px 1fr}.custom .chip{grid-column:span 1}}
+.entry{display:flex;flex-direction:column;gap:10px;background:var(--surface);border:2px solid var(--line);border-radius:12px;padding:14px}
+.time-in{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.unit{position:relative;display:block}
+.unit input{font-family:var(--display);font-size:1.6rem;font-weight:700;padding:10px 78px 10px 14px}
+.unit span{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:.8rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);pointer-events:none}
+@media (max-width:420px){.unit input{padding-right:14px;padding-bottom:26px}.unit span{top:auto;bottom:8px;transform:none;left:14px;right:auto}}
+.act{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.go{padding:12px;border-radius:9px;font-weight:800;font-size:.95rem;box-shadow:inset 0 -3px 0 rgba(0,0,0,.18)}
+.go.add{background:var(--grass);color:var(--grass-ink)}
+.go.sub{background:var(--red-soft);color:var(--redstone);box-shadow:none;border:2px solid var(--redstone)}
+.quick{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.quick .label{margin-right:4px}
+.mini{padding:5px 11px;border-radius:99px;font-weight:800;font-size:.82rem;border:1.5px solid var(--line);background:var(--surface)}
+.mini.add{color:var(--grass)} .mini.add:hover{background:var(--grass-soft);border-color:var(--grass)}
+.mini.sub{color:var(--redstone)} .mini.sub:hover{background:var(--red-soft);border-color:var(--redstone)}
 input{font:inherit;padding:10px 12px;border-radius:9px;border:2px solid var(--line);background:var(--surface);color:var(--fg);min-width:0;width:100%}
 input::placeholder{color:var(--muted)}
 
@@ -141,22 +150,24 @@ svg text{font-family:var(--body);font-size:11px;fill:var(--muted)}
 
   <section class="panel" aria-labelledby="adjH">
     <h2 id="adjH">Add or remove time</h2>
-    <div class="chips">
-      <button class="chip add" data-m="15">+15m</button>
-      <button class="chip add" data-m="30">+30m</button>
-      <button class="chip add" data-m="60">+1h</button>
-      <button class="chip add" data-m="120">+2h</button>
-      <button class="chip sub" data-m="-5">−5m</button>
-      <button class="chip sub" data-m="-15">−15m</button>
-      <button class="chip sub" data-m="-30">−30m</button>
-      <button class="chip sub" data-m="-60">−1h</button>
-    </div>
-    <form class="custom" id="customForm">
-      <input id="customMin" type="number" inputmode="numeric" min="1" max="1440" placeholder="Min" aria-label="Minutes">
+    <form class="entry" id="customForm">
+      <div class="time-in">
+        <label class="unit"><input id="customHr" type="number" inputmode="numeric" min="0" max="24" placeholder="0"><span>hours</span></label>
+        <label class="unit"><input id="customMin" type="number" inputmode="numeric" min="0" max="59" placeholder="0"><span>minutes</span></label>
+      </div>
       <input id="customNote" type="text" maxlength="60" placeholder="Why? (e.g. finished homework)" aria-label="Reason">
-      <button class="chip add" type="submit" data-act="add">Add</button>
-      <button class="chip sub" type="submit" data-act="remove">Remove</button>
+      <div class="act">
+        <button class="go add" type="submit" data-act="add">+ Add time</button>
+        <button class="go sub" type="submit" data-act="remove">− Remove time</button>
+      </div>
     </form>
+    <div class="quick">
+      <span class="label">Quick</span>
+      <button class="mini add" data-m="15">+15m</button>
+      <button class="mini add" data-m="30">+30m</button>
+      <button class="mini add" data-m="60">+1h</button>
+      <button class="mini sub" data-m="-15">−15m</button>
+    </div>
   </section>
 
   <section class="panel" aria-labelledby="statH">
@@ -402,14 +413,15 @@ let toastT;
 function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2600); }
 
 /* ---------- wire up ---------- */
-document.querySelectorAll(".chips .chip").forEach(b => b.onclick = () => adjust(+b.dataset.m));
+document.querySelectorAll(".quick .mini").forEach(b => b.onclick = () => adjust(+b.dataset.m));
 $("customForm").addEventListener("submit", ev => {
   ev.preventDefault();
-  const m = parseFloat($("customMin").value);
-  if (!m || m <= 0) { toast("Type how many minutes first"); $("customMin").focus(); return; }
+  const h = parseFloat($("customHr").value) || 0, mm = parseFloat($("customMin").value) || 0;
+  const m = Math.min(h * 60 + mm, 24 * 60);
+  if (m <= 0) { toast("Type some hours or minutes first"); $("customHr").focus(); return; }
   const sign = ev.submitter?.dataset.act === "remove" ? -1 : 1;
-  adjust(sign * Math.min(m, 1440), $("customNote").value.trim());
-  $("customMin").value = ""; $("customNote").value = "";
+  adjust(sign * m, $("customNote").value.trim());
+  $("customHr").value = ""; $("customMin").value = ""; $("customNote").value = "";
 });
 $("playBtn").onclick = togglePlay;
 
