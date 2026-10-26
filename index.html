@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#3d8b2f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="MC Time">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Minecraft Time Bank</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,800&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html,body{margin:0}
+/* Layout: one centered column — balance "bank vault" on top, actions, then week analytics and a ledger. */
+:root{
+  --bg:#eef0e8; --surface:#ffffff; --sunk:#e3e6da; --line:#cdd2c0;
+  --fg:#1f241a; --muted:#5f6853;
+  --grass:#3d8b2f; --grass-ink:#ffffff; --grass-soft:#dcebd3;
+  --gold:#c79a12; --gold-soft:#f5e8b8;
+  --redstone:#c0392b; --red-soft:#f6dcd8;
+  --display:"Pixelify Sans","Courier New",monospace;
+  --body:"Nunito Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#14170f; --surface:#1d2117; --sunk:#262b1f; --line:#353c2b;
+  --fg:#e8ecdf; --muted:#9aa58b;
+  --grass:#5fb84c; --grass-ink:#0f140b; --grass-soft:#24361d;
+  --gold:#e6bc3a; --gold-soft:#3a3218;
+  --redstone:#ef6a5a; --red-soft:#3d1f1b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#14170f; --surface:#1d2117; --sunk:#262b1f; --line:#353c2b;
+  --fg:#e8ecdf; --muted:#9aa58b;
+  --grass:#5fb84c; --grass-ink:#0f140b; --grass-soft:#24361d;
+  --gold:#e6bc3a; --gold-soft:#3a3218;
+  --redstone:#ef6a5a; --red-soft:#3d1f1b; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:620px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+h1,h2{font-family:var(--display);font-weight:700;margin:0;text-wrap:balance}
+h1{font-size:1.35rem;letter-spacing:.02em;display:flex;align-items:center;gap:10px}
+h2{font-size:1.05rem;letter-spacing:.03em}
+.label{font-size:.72rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+button{font:inherit;cursor:pointer;border:0;color:inherit;background:none}
+button:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.block{width:22px;height:22px;flex:none;background:
+  linear-gradient(var(--grass) 0 38%,transparent 38%),
+  repeating-linear-gradient(90deg,#8a5a34 0 25%,#76492a 25% 50%);border-radius:3px;box-shadow:inset 0 -3px 0 rgba(0,0,0,.18)}
+
+/* Vault */
+.vault{background:var(--surface);border:2px solid var(--line);border-radius:14px;padding:22px 20px 18px;display:flex;flex-direction:column;gap:14px;position:relative;overflow:hidden}
+.vault::after{content:"";position:absolute;inset:auto 0 0 0;height:6px;background:repeating-linear-gradient(90deg,var(--grass) 0 12px,color-mix(in srgb,var(--grass) 75%,#000) 12px 24px)}
+.vault.playing{border-color:var(--grass)}
+.vault.over{border-color:var(--redstone)}
+.vault.over::after{background:repeating-linear-gradient(90deg,var(--redstone) 0 12px,color-mix(in srgb,var(--redstone) 70%,#000) 12px 24px)}
+.balance{font-family:var(--display);font-weight:700;font-size:clamp(2.8rem,13vw,4.2rem);line-height:1;letter-spacing:.01em}
+.vault.over .balance{color:var(--redstone)}
+.status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.9rem;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;font-size:.78rem;font-weight:800;letter-spacing:.04em}
+.pill.idle{background:var(--sunk);color:var(--muted)}
+.pill.on{background:var(--grass-soft);color:var(--grass)}
+.pill.on::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--grass);animation:blink 1s steps(2) infinite}
+.pill.bad{background:var(--red-soft);color:var(--redstone)}
+@keyframes blink{50%{opacity:.2}}
+@media (prefers-reduced-motion:reduce){.pill.on::before{animation:none}}
+.play-btn{width:100%;padding:15px;border-radius:10px;font-family:var(--display);font-size:1.25rem;font-weight:700;letter-spacing:.03em;
+  background:var(--grass);color:var(--grass-ink);box-shadow:inset 0 -4px 0 rgba(0,0,0,.22);transition:transform .06s}
+.play-btn:active{transform:translateY(2px);box-shadow:inset 0 -2px 0 rgba(0,0,0,.22)}
+.play-btn.stop{background:var(--redstone);color:#fff}
+.meter{height:10px;background:var(--sunk);border-radius:3px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--grass);width:0;transition:width .4s}
+.vault.over .meter i{background:var(--redstone)}
+
+/* Adjust */
+.panel{display:flex;flex-direction:column;gap:12px}
+.chips{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.chip{padding:11px 4px;border-radius:9px;font-weight:800;font-size:.95rem;border:2px solid var(--line);background:var(--surface)}
+.chip.add{color:var(--grass)} .chip.add:hover{background:var(--grass-soft);border-color:var(--grass)}
+.chip.sub{color:var(--redstone)} .chip.sub:hover{background:var(--red-soft);border-color:var(--redstone)}
+.custom{display:grid;grid-template-columns:80px 1fr auto auto;gap:8px}
+@media (max-width:460px){.custom{grid-template-columns:76px 1fr}.custom .chip{grid-column:span 1}}
+input{font:inherit;padding:10px 12px;border-radius:9px;border:2px solid var(--line);background:var(--surface);color:var(--fg);min-width:0;width:100%}
+input::placeholder{color:var(--muted)}
+
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:2px solid var(--line);border-radius:12px;overflow:hidden}
+@media (max-width:520px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.stat b{font-family:var(--display);font-size:1.35rem;font-weight:700}
+.chart-card{background:var(--surface);border:2px solid var(--line);border-radius:12px;padding:14px 12px 8px}
+.legend{display:flex;gap:14px;font-size:.8rem;color:var(--muted);padding:0 4px 6px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
+svg text{font-family:var(--body);font-size:11px;fill:var(--muted)}
+
+/* Ledger */
+.ledger{display:flex;flex-direction:column;background:var(--surface);border:2px solid var(--line);border-radius:12px;overflow:hidden}
+.row{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;padding:10px 12px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.tag{width:30px;height:30px;border-radius:6px;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:.95rem}
+.tag.add{background:var(--grass-soft);color:var(--grass)}
+.tag.remove{background:var(--red-soft);color:var(--redstone)}
+.tag.play{background:var(--gold-soft);color:var(--gold)}
+.row .what{min-width:0}
+.row .what div{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .what small{color:var(--muted);font-size:.78rem}
+.amt{font-family:var(--mono);font-size:.88rem}
+.amt.pos{color:var(--grass)} .amt.neg{color:var(--redstone)}
+.del{width:30px;height:30px;border-radius:6px;color:var(--muted);font-size:1rem}
+.del:hover{background:var(--sunk)}
+.del.confirm{width:auto;padding:0 8px;background:var(--red-soft);color:var(--redstone);font-size:.75rem;font-weight:800}
+.empty{padding:22px;text-align:center;color:var(--muted)}
+.linkbtn{color:var(--grass);font-weight:800;text-decoration:underline;text-underline-offset:3px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:700;font-size:.9rem;z-index:20;max-width:calc(100% - 32px)}
+.sync{font-size:.75rem;color:var(--muted)}
+.head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+</style>
+</head><body>
+
+<div class="wrap">
+  <div class="head">
+    <h1><span class="block" aria-hidden="true"></span>Minecraft Time Bank</h1>
+    <span class="sync" id="sync">Saved on this phone</span>
+  </div>
+
+  <section class="vault" id="vault" aria-live="polite">
+    <div class="status"><span class="label">Time left</span><span class="pill idle" id="pill">Not playing</span></div>
+    <div class="balance num" id="balance">0m</div>
+    <div class="meter" aria-hidden="true"><i id="meter"></i></div>
+    <div class="status num" id="sub">Add some time to get started.</div>
+    <button class="play-btn" id="playBtn">▶ Start playing</button>
+  </section>
+
+  <section class="panel" aria-labelledby="adjH">
+    <h2 id="adjH">Add or remove time</h2>
+    <div class="chips">
+      <button class="chip add" data-m="15">+15m</button>
+      <button class="chip add" data-m="30">+30m</button>
+      <button class="chip add" data-m="60">+1h</button>
+      <button class="chip add" data-m="120">+2h</button>
+      <button class="chip sub" data-m="-5">−5m</button>
+      <button class="chip sub" data-m="-15">−15m</button>
+      <button class="chip sub" data-m="-30">−30m</button>
+      <button class="chip sub" data-m="-60">−1h</button>
+    </div>
+    <form class="custom" id="customForm">
+      <input id="customMin" type="number" inputmode="numeric" min="1" max="1440" placeholder="Min" aria-label="Minutes">
+      <input id="customNote" type="text" maxlength="60" placeholder="Why? (e.g. finished homework)" aria-label="Reason">
+      <button class="chip add" type="submit" data-act="add">Add</button>
+      <button class="chip sub" type="submit" data-act="remove">Remove</button>
+    </form>
+  </section>
+
+  <section class="panel" aria-labelledby="statH">
+    <h2 id="statH">Last 7 days</h2>
+    <div class="stats">
+      <div class="stat"><span class="label">Played</span><b class="num" id="sPlayed">0m</b></div>
+      <div class="stat"><span class="label">Earned</span><b class="num" id="sEarned">0m</b></div>
+      <div class="stat"><span class="label">Sessions</span><b class="num" id="sSessions">0</b></div>
+      <div class="stat"><span class="label">Avg session</span><b class="num" id="sAvg">–</b></div>
+    </div>
+    <div class="chart-card">
+      <div class="legend"><span><i style="background:var(--gold)"></i>Played</span><span><i style="background:var(--grass)"></i>Earned</span></div>
+      <svg id="chart" viewBox="0 0 560 210" width="100%" role="img" aria-label="Minutes played and earned per day"></svg>
+    </div>
+    <div class="status num" id="insight"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="logH">
+    <h2 id="logH">History</h2>
+    <div class="ledger" id="ledger"></div>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const LS_KEY = "mc-time-bank-v1";
+let S = { balance: 0, log: [], session: null };
+let ref = null, writing = Promise.resolve(), dirty = false;
+let alerted = false, audioCtx = null;
+
+const $ = id => document.getElementById(id);
+const now = () => Date.now();
+const uid = () => now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+function fmt(sec, withSec) {
+  const neg = sec < 0; sec = Math.abs(Math.round(sec));
+  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+  let out;
+  if (withSec) out = h ? `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}` : `${m}:${String(s).padStart(2,"0")}`;
+  else out = h ? (m ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+  return (neg ? "−" : "") + out;
+}
+const elapsed = () => S.session ? (now() - S.session.start) / 1000 : 0;
+const live = () => S.balance - elapsed();
+
+/* ---------- storage ---------- */
+function loadLocal() {
+  try { const r = localStorage.getItem(LS_KEY); if (r) S = Object.assign({ balance: 0, log: [], session: null }, JSON.parse(r)); } catch (e) {}
+}
+function save() {
+  S.log = S.log.slice(-1500);
+  try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {}
+  if (!ref) return;
+  if (dirty) return; dirty = true;
+  writing = writing.then(async () => {
+    dirty = false;
+    try { await ref.set(JSON.parse(JSON.stringify(S))); $("sync").textContent = "Saved to your account"; }
+    catch (e) { $("sync").textContent = "Saved on this device"; }
+  });
+}
+async function connect() {
+  if (!window.claude?.use) return;
+  try {
+    const [db, user] = await Promise.all([claude.use("db"), claude.use("user")]);
+    if (!db || !user) return;
+    const id = await user.id(); if (!id) return;
+    ref = db.doc("data/users/" + id + "/bank");
+    let first = true;
+    ref.onSnapshot(snap => {
+      if (snap.exists) {
+        S = Object.assign({ balance: 0, log: [], session: null }, JSON.parse(JSON.stringify(snap.data())));
+        try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {}
+        $("sync").textContent = "Saved to your account";
+        render();
+      } else if (first && (S.log.length || S.session)) {
+        save(); // move this device's data into the account
+      }
+      first = false;
+    }, () => { ref = null; });
+  } catch (e) {}
+}
+
+/* ---------- actions ---------- */
+function adjust(min, note) {
+  if (!min) return;
+  const sec = Math.round(min * 60);
+  S.balance += sec;
+  S.log.push({ id: uid(), t: now(), type: sec > 0 ? "add" : "remove", sec: Math.abs(sec), note: note || "" });
+  save(); render();
+  toast(`${sec > 0 ? "Added" : "Removed"} ${fmt(Math.abs(sec))}`);
+}
+function togglePlay() {
+  initAudio();
+  if (S.session) {
+    const sec = Math.max(0, Math.round(elapsed()));
+    S.balance -= sec;
+    if (sec >= 5) S.log.push({ id: uid(), t: S.session.start, end: now(), type: "play", sec, note: "" });
+    S.session = null; alerted = false;
+    save(); render();
+    toast(`Played ${fmt(sec, sec < 60)} · ${fmt(S.balance)} left`);
+  } else {
+    S.session = { start: now() }; alerted = S.balance <= 0;
+    save(); render();
+  }
+}
+function undo(id) {
+  const i = S.log.findIndex(e => e.id === id); if (i < 0) return;
+  const e = S.log[i];
+  S.balance += e.type === "add" ? -e.sec : e.sec;
+  S.log.splice(i, 1);
+  save(); render(); toast("Entry removed and balance fixed");
+}
+function loadExample() {
+  const d = new Date(); d.setHours(0,0,0,0);
+  const day = n => d.getTime() - n * 86400000;
+  const L = [], add = (n,h,m,type,min,note) => L.push({ id: uid(), t: day(n) + (h*60+m)*60000, type, sec: min*60, note: note||"" , example: true});
+  add(6,16,0,"add",60,"Example: homework done"); add(6,17,10,"play",45);
+  add(5,15,30,"add",30,"Example: chores"); add(5,18,0,"play",40);
+  add(4,16,0,"add",45,"Example: reading"); add(4,19,0,"play",30);
+  add(3,10,0,"add",90,"Example: weekend bonus"); add(3,11,0,"play",75); add(3,15,0,"play",35);
+  add(2,16,0,"add",30,"Example: practiced piano"); add(2,17,0,"remove",15,"Example: late to bed");
+  add(1,16,0,"add",60,"Example: homework done"); add(1,18,30,"play",50);
+  add(0,8,0,"add",30,"Example: made my bed");
+  S.log = L.sort((a,b)=>a.t-b.t);
+  S.balance = L.reduce((b,e)=> b + (e.type==="add"? e.sec : -e.sec), 0);
+  save(); render(); toast("Loaded example week. Clear it any time below.");
+}
+function clearAll() { S = { balance: 0, log: [], session: null }; save(); render(); toast("Everything cleared"); }
+
+/* ---------- alert when time runs out ---------- */
+function initAudio() { try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume?.(); } catch (e) {} }
+function beep() {
+  if (!audioCtx) return;
+  [0, .25, .5].forEach(o => { const os = audioCtx.createOscillator(), g = audioCtx.createGain();
+    os.type = "square"; os.frequency.value = 660; g.gain.value = .08;
+    os.connect(g).connect(audioCtx.destination); os.start(audioCtx.currentTime + o); os.stop(audioCtx.currentTime + o + .15); });
+}
+
+/* ---------- render ---------- */
+function render() {
+  const bal = live(), playing = !!S.session, over = bal < 0 || (playing && bal <= 0);
+  $("vault").className = "vault" + (playing ? " playing" : "") + (over ? " over" : "");
+  $("balance").textContent = playing ? fmt(bal, true) : fmt(bal);
+  const pill = $("pill");
+  if (playing && bal <= 0) { pill.className = "pill bad"; pill.textContent = "Time's up — stop playing!"; }
+  else if (playing) { pill.className = "pill on"; pill.textContent = "Playing"; }
+  else if (bal < 0) { pill.className = "pill bad"; pill.textContent = "You owe time"; }
+  else { pill.className = "pill idle"; pill.textContent = "Not playing"; }
+  const btn = $("playBtn");
+  btn.textContent = playing ? "■ Stop playing" : "▶ Start playing";
+  btn.classList.toggle("stop", playing);
+  const sub = $("sub");
+  if (playing) sub.textContent = `This session: ${fmt(elapsed(), true)} · started ${new Date(S.session.start).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}`;
+  else if (bal < 0) sub.textContent = `You went over by ${fmt(-bal)}. Earn it back before the next session.`;
+  else if (!S.log.length) sub.textContent = "Add some time to get started.";
+  else sub.textContent = `That's about ${Math.floor(bal / 1200)} Minecraft days (20 min each).`;
+  const start = playing ? S.balance : Math.max(bal, 1);
+  $("meter").style.width = playing ? Math.max(0, Math.min(100, bal / Math.max(S.balance, 1) * 100)) + "%" : (bal > 0 ? "100%" : "0%");
+  if (playing && bal <= 0 && !alerted) { alerted = true; beep(); }
+  renderStats(); renderLedger();
+}
+
+function dayKey(t) { const d = new Date(t); return d.getFullYear()*10000 + (d.getMonth()+1)*100 + d.getDate(); }
+let lastStatsKey = "";
+function renderStats() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const days = [...Array(7)].map((_, i) => { const t = today.getTime() - (6 - i) * 86400000; return { t, k: dayKey(t), played: 0, earned: 0 }; });
+  const byKey = Object.fromEntries(days.map(d => [d.k, d]));
+  let sessions = 0, longest = 0;
+  for (const e of S.log) {
+    const d = byKey[dayKey(e.t)]; if (!d) continue;
+    if (e.type === "play") { d.played += e.sec; sessions++; longest = Math.max(longest, e.sec); }
+    if (e.type === "add") d.earned += e.sec;
+  }
+  if (S.session) { const d = byKey[dayKey(S.session.start)]; if (d) d.played += elapsed(); }
+  const played = days.reduce((a, d) => a + d.played, 0), earned = days.reduce((a, d) => a + d.earned, 0);
+  $("sPlayed").textContent = fmt(played); $("sEarned").textContent = fmt(earned);
+  const done = S.log.filter(e => e.type === "play" && byKey[dayKey(e.t)]).reduce((a, e) => a + e.sec, 0);
+  $("sSessions").textContent = sessions; $("sAvg").textContent = sessions ? fmt(done / sessions) : "–";
+  const top = days.reduce((a, d) => d.played > a.played ? d : a, days[0]);
+  $("insight").textContent = played
+    ? `Most play: ${new Date(top.t).toLocaleDateString([], {weekday:"long"})} (${fmt(top.played)}). Longest session: ${fmt(longest || elapsed())}. ${earned >= played ? "You earned more than you played this week." : "You played more than you earned this week."}`
+    : "No play time in the last 7 days yet.";
+
+  const key = days.map(d => Math.round(d.played/60) + "," + Math.round(d.earned/60)).join("|");
+  if (key === lastStatsKey) return; lastStatsKey = key;
+  drawChart(days);
+}
+
+function drawChart(days) {
+  const W = 560, H = 210, L = 40, R = 8, T = 10, B = 28, ih = H - T - B, iw = W - L - R;
+  const maxMin = Math.max(30, ...days.map(d => Math.max(d.played, d.earned) / 60));
+  const step = maxMin <= 60 ? 15 : maxMin <= 120 ? 30 : maxMin <= 300 ? 60 : 120;
+  const top = Math.ceil(maxMin / step) * step;
+  const y = m => T + ih - (m / top) * ih;
+  let s = "";
+  for (let m = 0; m <= top; m += step) {
+    s += `<line x1="${L}" x2="${W-R}" y1="${y(m)}" y2="${y(m)}" stroke="var(--line)" stroke-width="1" ${m? 'stroke-dasharray="3 4"':''}/>`;
+    s += `<text x="${L-6}" y="${y(m)+4}" text-anchor="end">${m >= 60 && m % 60 === 0 ? m/60 + "h" : m + "m"}</text>`;
+  }
+  const slot = iw / 7, bw = Math.min(20, slot * .3);
+  days.forEach((d, i) => {
+    const cx = L + slot * i + slot / 2, pm = d.played / 60, em = d.earned / 60;
+    const isToday = i === 6;
+    s += `<rect x="${cx - bw - 2}" y="${y(pm)}" width="${bw}" height="${Math.max(0, y(0) - y(pm))}" rx="2" fill="var(--gold)"><title>Played ${fmt(d.played)}</title></rect>`;
+    s += `<rect x="${cx + 2}" y="${y(em)}" width="${bw}" height="${Math.max(0, y(0) - y(em))}" rx="2" fill="var(--grass)"><title>Earned ${fmt(d.earned)}</title></rect>`;
+    s += `<text x="${cx}" y="${H - 8}" text-anchor="middle" style="${isToday ? 'fill:var(--fg);font-weight:800' : ''}">${isToday ? "Today" : new Date(d.t).toLocaleDateString([], {weekday:"short"})}</text>`;
+  });
+  $("chart").innerHTML = s;
+}
+
+let confirmId = null, lastLedgerKey = "";
+function renderLedger() {
+  const key = S.log.length + ":" + (S.log.at(-1)?.id || "") + ":" + confirmId;
+  if (key === lastLedgerKey) return; lastLedgerKey = key;
+  const box = $("ledger");
+  if (!S.log.length) {
+    box.innerHTML = `<div class="empty">Nothing here yet. Add time above, or <button class="linkbtn" id="exBtn">load an example week</button> to see how it works.</div>`;
+    $("exBtn").onclick = loadExample; return;
+  }
+  const rows = S.log.slice().reverse().slice(0, 40).map(e => {
+    const when = new Date(e.t), today = dayKey(now()) === dayKey(e.t);
+    const ws = (today ? "Today" : when.toLocaleDateString([], {weekday:"short", month:"short", day:"numeric"})) + ", " + when.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+    const label = e.type === "play" ? "Played Minecraft" : e.note || (e.type === "add" ? "Added time" : "Removed time");
+    const sign = e.type === "add" ? "+" : "−", cls = e.type === "add" ? "pos" : "neg";
+    const ic = e.type === "add" ? "+" : e.type === "remove" ? "−" : "▶";
+    const del = confirmId === e.id ? `<button class="del confirm" data-undo="${e.id}">Undo?</button>` : `<button class="del" data-ask="${e.id}" aria-label="Remove entry">✕</button>`;
+    return `<div class="row"><span class="tag ${e.type}">${ic}</span><div class="what"><div></div><small>${ws}</small></div><span class="amt num ${cls}">${sign}${fmt(e.sec, e.sec < 60)}</span>${del}</div>`;
+  });
+  box.innerHTML = rows.join("") + `<div class="row" style="grid-template-columns:1fr auto"><small style="color:var(--muted)">${S.log.length} entries</small><button class="del confirm" id="clearBtn">${confirmId === "ALL" ? "Tap again to erase everything" : "Clear all"}</button></div>`;
+  // set labels safely
+  const list = S.log.slice().reverse().slice(0, 40);
+  box.querySelectorAll(".what div").forEach((el, i) => { const e = list[i]; el.textContent = e.type === "play" ? "Played Minecraft" : e.note || (e.type === "add" ? "Added time" : "Removed time"); });
+  $("clearBtn").onclick = () => { if (confirmId === "ALL") { confirmId = null; clearAll(); } else { confirmId = "ALL"; renderLedger(); } };
+}
+$("ledger").addEventListener("click", ev => {
+  const a = ev.target.closest("[data-ask]"), u = ev.target.closest("[data-undo]");
+  if (a) { confirmId = a.dataset.ask; renderLedger(); }
+  if (u) { confirmId = null; undo(u.dataset.undo); }
+});
+
+let toastT;
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2600); }
+
+/* ---------- wire up ---------- */
+document.querySelectorAll(".chips .chip").forEach(b => b.onclick = () => adjust(+b.dataset.m));
+$("customForm").addEventListener("submit", ev => {
+  ev.preventDefault();
+  const m = parseFloat($("customMin").value);
+  if (!m || m <= 0) { toast("Type how many minutes first"); $("customMin").focus(); return; }
+  const sign = ev.submitter?.dataset.act === "remove" ? -1 : 1;
+  adjust(sign * Math.min(m, 1440), $("customNote").value.trim());
+  $("customMin").value = ""; $("customNote").value = "";
+});
+$("playBtn").onclick = togglePlay;
+
+loadLocal(); render();
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+setInterval(() => { if (S.session) render(); }, 1000);
+</script>
+
+</body></html>
